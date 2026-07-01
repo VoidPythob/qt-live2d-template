@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.26)
 
-set(APP_NAME QtLive2dTemplate)
+set(APP_NAME ciallo)
 project(${APP_NAME})
 
 # 第三方库根目录

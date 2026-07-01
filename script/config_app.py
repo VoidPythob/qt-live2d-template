@@ -1,99 +1,91 @@
 #!/usr/bin/env python3
-"""配置项目名和 Qt 路径，写入 CMakeLists.txt 和各平台脚本。"""
+"""配置项目名和 Qt 路径。
+
+写入 CMakeLists.txt 的 APP_NAME，以及 app.env 供其他脚本读取。"""
 
 import argparse
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-
-FILES = {
-    "cmakelists": {
-        "path": ROOT / "CMakeLists.txt",
-        "replacements": [
-            # set(APP_NAME <name>)
-            (r"set\(APP_NAME\s+\S+\)", 'set(APP_NAME {name})'),
-        ],
-    },
-    "cmake_ps1": {
-        "path": ROOT / "script" / "win" / "cmake.ps1",
-        "replacements": [
-            # $QtSdkPath = "..."
-            (r'\$QtSdkPath\s*=\s*"[^"]*"', '$QtSdkPath = "{qt_path}"'),
-        ],
-    },
-    "run_ps1": {
-        "path": ROOT / "script" / "win" / "run.ps1",
-        "replacements": [
-            # $AppName = "..."
-            (r'\$AppName\s*=\s*"[^"]*"', '$AppName = "{name}"'),
-        ],
-    },
-    "cmake_sh": {
-        "path": ROOT / "script" / "linux" / "cmake.sh",
-        "replacements": [
-            # QT_SDK_PATH="..." （仅变量赋值行，排除 -DQT_SDK_PATH= 的 cmake 参数行）
-            (r'(?<!-D)QT_SDK_PATH="[^"]*"', 'QT_SDK_PATH="{qt_path}"'),
-        ],
-    },
-    "run_sh": {
-        "path": ROOT / "script" / "linux" / "run.sh",
-        "replacements": [
-            # APP_NAME="..."
-            (r'APP_NAME="[^"]*"', 'APP_NAME="{name}"'),
-        ],
-    },
-}
+ENV_PATH = ROOT / "app.env"
+CMAKE_PATH = ROOT / "CMakeLists.txt"
 
 
-def apply(filepath: Path, replacements: list[tuple[str, str]], name: str, qt_path: str) -> int:
-    """对单个文件应用所有替换，返回替换次数。"""
-    text = filepath.read_text(encoding="utf-8")
-    count = 0
-    for pattern, template in replacements:
-        new_text, n = re.subn(pattern, template.format(name=name, qt_path=qt_path), text)
-        if n > 0:
-            count += n
-            text = new_text
-    if count > 0:
-        filepath.write_text(text, encoding="utf-8")
-    return count
+def load_env() -> dict[str, str]:
+    """从 app.env 读取默认值。"""
+    defaults: dict[str, str] = {}
+    if not ENV_PATH.exists():
+        return defaults
+    for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            defaults[k.strip()] = v.strip().strip('"')
+    return defaults
 
 
-def main():
-    parser = argparse.ArgumentParser(description="配置 Qt Live2D 项目名和 Qt 路径")
+def save_env(name: str, qt_path: str) -> None:
+    ENV_PATH.write_text(
+        f"APP_NAME={name}\nQT_SDK_PATH={qt_path}\n", encoding="utf-8"
+    )
+
+
+def update_cmake(name: str) -> int:
+    """替换 CMakeLists.txt 中的 set(APP_NAME ...)，返回替换次数。"""
+    text = CMAKE_PATH.read_text(encoding="utf-8")
+    new_text, n = re.subn(
+        r"set\(APP_NAME\s+\S+\)", f"set(APP_NAME {name})", text
+    )
+    if n > 0:
+        CMAKE_PATH.write_text(new_text, encoding="utf-8")
+    return n
+
+
+def prompt(label: str, default: str | None = None) -> str | None:
+    if default:
+        label = f"{label} [{default}]: "
+    else:
+        label = f"{label}: "
+    value = input(label).strip()
+    return value if value else default
+
+
+def main() -> int:
+    defaults = load_env()
+
+    parser = argparse.ArgumentParser(description="配置项目名和 Qt 路径")
     parser.add_argument("--name", "-n", help="项目名（如 MyLive2DApp）")
     parser.add_argument("--qt-path", "-q", help="Qt SDK 路径（如 D:/Qt/6.11.1/msvc2022_64）")
     args = parser.parse_args()
 
-    # 交互式输入
-    name = args.name or input("项目名 (APP_NAME): ").strip()
-    qt_path = args.qt_path or input("Qt SDK 路径: ").strip()
+    name = args.name or prompt("项目名 (APP_NAME)", defaults.get("APP_NAME"))
+    qt_path = args.qt_path or prompt("Qt SDK 路径", defaults.get("QT_SDK_PATH"))
 
     if not name:
-        print("错误：项目名不能为空")
+        print("错误：项目名不能为空", file=sys.stderr)
         return 1
     if not qt_path:
-        print("错误：Qt SDK 路径不能为空")
+        print("错误：Qt SDK 路径不能为空", file=sys.stderr)
         return 1
 
-    # 规范化路径分隔符
     qt_path = qt_path.replace("\\", "/")
 
     print(f"\n项目名: {name}")
     print(f"Qt 路径: {qt_path}")
     print()
 
-    total = 0
-    for key, cfg in FILES.items():
-        n = apply(cfg["path"], cfg["replacements"], name, qt_path)
-        if n > 0:
-            print(f"  ✓ {cfg['path'].relative_to(ROOT)} ({n} 处)")
-            total += n
-        else:
-            print(f"  - {cfg['path'].relative_to(ROOT)} (无匹配，跳过)")
+    n = update_cmake(name)
+    if n > 0:
+        print(f"  ✓ CMakeLists.txt → set(APP_NAME {name})")
+    else:
+        print(f"  - CMakeLists.txt (无匹配，跳过)")
 
-    print(f"\n完成，共修改 {total} 处。")
+    save_env(name, qt_path)
+    print(f"  ✓ app.env 已更新")
+
+    print(f"\n完成。")
     return 0
 
 
