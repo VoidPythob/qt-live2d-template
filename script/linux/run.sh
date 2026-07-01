@@ -3,7 +3,7 @@ set -euo pipefail
 
 CONFIG="${1:-Release}"
 BUILD_DIR="build"
-APP_NAME="QtLive2dDemo"
+APP_NAME="QtLive2dTemplate"
 
 # 查找可执行文件
 if [[ "$OSTYPE" == "darwin"* ]]; then

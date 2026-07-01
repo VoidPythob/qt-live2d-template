@@ -3,7 +3,7 @@ param(
 )
 
 $BuildDir = "build"
-$AppName = "QtLive2dDemo"
+$AppName = "QtLive2dTemplate"
 $ExePath = "$BuildDir\$Config\$AppName.exe"
 
 if (-not (Test-Path $ExePath)) {
