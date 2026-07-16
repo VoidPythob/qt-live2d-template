@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.26)
 set(APP_NAME QtLive2dTemplate)
 project(${APP_NAME})
 
+# 项目根目录
+set(PROJECT_DIR ${CMAKE_SOURCE_DIR}/${APP_NAME})
 # 第三方库根目录
 set(THIRDPARTY_DIR ${CMAKE_SOURCE_DIR}/Thirdparty)
 
@@ -31,8 +33,6 @@ target_compile_options(libglew PRIVATE $<$<C_COMPILER_ID:MSVC>:/Zi>)
 # 抑制 glew.h 与 Windows SDK 的 APIENTRY 宏重定义警告
 target_compile_options(libglew PRIVATE $<$<C_COMPILER_ID:MSVC>:/wd4005>)
 
-# TODO 将来可能删除此FLAG
-option(IS_QT_PROJECT "Qt Project Flag, Test Not Qt Project, Will Delete" OFF)
 # Qt开发工具链位置
 option(QT_SDK_PATH "Qt Sdk Path" "")
 # CRT 链接方式选项：MT（静态CRT）/ MD（动态CRT）
@@ -66,6 +66,8 @@ find_package(Qt6 COMPONENTS
 # 头文件搜索路径
 include_directories(./
     LAppLive2D
+    ${PROJECT_DIR}/include
+    ${PROJECT_DIR}/include/widget
     ${THIRDPARTY_DIR}/CubismSdk/Core/include
 
     ${THIRDPARTY_DIR}/CubismSdk/Framework/src
@@ -87,6 +89,8 @@ include_directories(./
 
 add_executable(${APP_NAME}
     ${APP_NAME}/src/main.cpp
+    ${PROJECT_DIR}/include/widget/QLive2DWidget.h 
+    ${PROJECT_DIR}/src/widget/QLive2DWidget.cpp
     "${LappLive}"
 )
 
@@ -144,34 +148,24 @@ target_link_libraries(${APP_NAME}
     glfw
     opengl32
     glu32
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
 )
 
-if(IS_QT_PROJECT)
-    target_link_libraries(${APP_NAME}
-        Qt6::Core
-        Qt6::Gui
-        Qt6::Widgets
-        Qt6::OpenGL
-        Qt6::OpenGLWidgets
-    )
-endif()
+# 部署qt依赖
+find_program(WINDEPLOYQT6 windeployqt6
+    PATHS ${QT_SDK_PATH}
+)
 
-
-if (IS_QT_PROJECT)
-    # 部署qt依赖
-    find_program(WINDEPLOYQT6 windeployqt6
-        PATHS ${QT_SDK_PATH}
-    )
-    add_custom_command(TARGET ${APP_NAME} POST_BUILD
-        COMMAND ${WINDEPLOYQT6}
-            --dir $<TARGET_FILE_DIR:${APP_NAME}>
-            $<TARGET_FILE:${APP_NAME}>
-        COMMENT "Deploying Qt dependencies..."
-    )
-else()
-    message("Not Qt Project, Not Need Deploying Qt")
-endif()
-
+add_custom_command(TARGET ${APP_NAME} POST_BUILD
+    COMMAND ${WINDEPLOYQT6}
+        --dir $<TARGET_FILE_DIR:${APP_NAME}>
+        $<TARGET_FILE:${APP_NAME}>
+    COMMENT "Deploying Qt dependencies..."
+)
 
 # 部署资源
 add_custom_command(TARGET ${APP_NAME} POST_BUILD

@@ -1,20 +1,29 @@
-#include "LAppDelegate.hpp"
-#include <windows.h>
+#include <QApplication>
+#include <QMainWindow>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QLive2DWidget.h>
 
-int main()
+int main(int argc, char *argv[])
 {
-    UINT preConsoleOutputCP = GetConsoleOutputCP();
-    SetConsoleOutputCP(65001);
+    QApplication a(argc, argv);
+    QMainWindow m;
+    QWidget center;
+    QPushButton btn;
+    QHBoxLayout layout;
 
-    if (LAppDelegate::GetInstance()->Initialize() == GL_FALSE)
-    {
-        SetConsoleOutputCP(preConsoleOutputCP);
-        return 1;
-    }
+    QLive2DWidget live2D;
 
-    LAppDelegate::GetInstance()->Run();
+    btn.setText("btn");
 
-    SetConsoleOutputCP(preConsoleOutputCP);
+    center.setLayout(&layout);
+    layout.addWidget(&btn);
+    layout.addWidget(&live2D);
 
-    return 0;
+    m.setCentralWidget(&center);
+    m.setAttribute(Qt::WA_TranslucentBackground);
+
+    m.show();
+
+    return a.exec();
 }
